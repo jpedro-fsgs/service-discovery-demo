@@ -1,0 +1,12 @@
+{
+  "name": "service-discovery-atividade",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "frontend",
+    "tests"
+  ]
+}

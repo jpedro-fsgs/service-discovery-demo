@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Social 🎉</title>
+    <meta name="description" content="Rede Social de Emojis em Tempo Real com Service Discovery">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>Emoji Social <span class="header-emoji">🎉</span></h1>
+                <p class="subtitle">Rede Social de Emojis em Tempo Real</p>
+            </div>
+            <div class="status-bar" id="status-bar">
+                <span class="status-dot" id="status-dot"></span>
+                <span class="status-text" id="status-text">Conectando...</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="emoji-section">
+                <div class="emoji-grid" id="emoji-grid">
+                    <button class="emoji-btn" data-emoji="😀">😀</button>
+                    <button class="emoji-btn" data-emoji="😍">😍</button>
+                    <button class="emoji-btn" data-emoji="🥳">🥳</button>
+                    <button class="emoji-btn" data-emoji="😂">😂</button>
+                    <button class="emoji-btn" data-emoji="🤩">🤩</button>
+                    <button class="emoji-btn" data-emoji="😎">😎</button>
+                    <button class="emoji-btn" data-emoji="🥰">🥰</button>
+                    <button class="emoji-btn" data-emoji="🤣">🤣</button>
+                    <button class="emoji-btn" data-emoji="😱">😱</button>
+                    <button class="emoji-btn" data-emoji="🤯">🤯</button>
+                    <button class="emoji-btn" data-emoji="🔥">🔥</button>
+                    <button class="emoji-btn" data-emoji="❤️">❤️</button>
+                    <button class="emoji-btn" data-emoji="💯">💯</button>
+                    <button class="emoji-btn" data-emoji="👏">👏</button>
+                    <button class="emoji-btn" data-emoji="🎉">🎉</button>
+                    <button class="emoji-btn" data-emoji="✨">✨</button>
+                    <button class="emoji-btn" data-emoji="💪">💪</button>
+                    <button class="emoji-btn" data-emoji="🙌">🙌</button>
+                    <button class="emoji-btn" data-emoji="👀">👀</button>
+                    <button class="emoji-btn" data-emoji="🚀">🚀</button>
+                </div>
+            </section>
+
+            <section class="feed-section">
+                <h2>Feed <span id="toast-container"></span></h2>
+                <div class="feed-container" id="feed-container">
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Powered by Consul Service Discovery & Fastify TypeScript</p>
+        </footer>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
