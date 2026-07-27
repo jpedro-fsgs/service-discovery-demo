@@ -23,6 +23,11 @@
             </div>
         </header>
 
+        <div class="user-settings">
+            <input type="text" id="username-input" placeholder="Seu nome" maxlength="15">
+            <button id="change-name-btn">Mudar Nome</button>
+        </div>
+
         <main>
             <section class="emoji-section">
                 <div class="emoji-grid" id="emoji-grid">
@@ -50,7 +55,16 @@
             </section>
 
             <section class="feed-section">
-                <h2>Feed <span id="toast-container"></span></h2>
+                <h2>Feed</h2>
+                <div class="feed-controls">
+                    <div class="feed-actions">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="live-reload-cb" checked>
+                            <span>Live Reload</span>
+                        </label>
+                        <button id="reload-feed-btn">🔄 Recarregar</button>
+                    </div>
+                </div>
                 <div class="feed-container" id="feed-container">
                 </div>
             </section>
@@ -59,6 +73,7 @@
         <footer>
             <p>Powered by Consul Service Discovery & Fastify TypeScript</p>
         </footer>
+        <div id="toast-container"></div>
     </div>
     <script src="app.js"></script>
 </body>

@@ -12,6 +12,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = document.getElementById('status-text');
     const feedContainer = document.getElementById('feed-container');
     const toastContainer = document.getElementById('toast-container');
+    const nameInput = document.getElementById('username-input');
+    const nameBtn = document.getElementById('change-name-btn');
+    const liveReloadCb = document.getElementById('live-reload-cb');
+    const reloadFeedBtn = document.getElementById('reload-feed-btn');
+
+    nameInput.value = userId;
+
+    async function changeName() {
+        const newName = nameInput.value.trim();
+        if (!newName || newName === userId) return;
+        
+        showStatus('loading', 'Trocando nome...');
+        try {
+            const response = await fetch('/api/auth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: newName })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                userId = newName;
+                localStorage.setItem('emoji_userId', userId);
+                jwt = data.token;
+                localStorage.setItem('emoji_jwt', jwt);
+                showStatus('connected');
+                showToast(`Nome alterado para ${userId}`);
+            } else { throw new Error('Falha'); }
+        } catch (error) {
+            showToast('Não foi possível trocar de nome: Serviço de Autenticação indisponível');
+            nameInput.value = userId;
+            if (jwt) showStatus('auth-offline', 'Auth offline (você continua logado)');
+        }
+    }
+    nameBtn.addEventListener('click', changeName);
+
+    reloadFeedBtn.addEventListener('click', () => {
+        reloadFeedBtn.style.opacity = '0.5';
+        fetchFeed().finally(() => reloadFeedBtn.style.opacity = '1');
+    });
 
     function showStatus(status, customText = null) {
         statusBar.className = 'status-bar ' + status;
@@ -25,8 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showToast(msg) {
         toastContainer.textContent = msg;
-        toastContainer.style.opacity = '1';
-        setTimeout(() => { toastContainer.style.opacity = '0'; }, 3000);
+        toastContainer.classList.add('show');
+        setTimeout(() => { toastContainer.classList.remove('show'); }, 3000);
     }
 
     async function authenticate() {
@@ -123,5 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     showStatus('loading'); authenticate();
     document.querySelectorAll('.emoji-btn').forEach(btn => { btn.addEventListener('click', (e) => { sendEmoji(e.target.getAttribute('data-emoji'), e.target); }); });
-    setInterval(fetchFeed, 2000);
+    setInterval(() => {
+        if (liveReloadCb.checked) {
+            fetchFeed();
+        }
+    }, 2000);
 });

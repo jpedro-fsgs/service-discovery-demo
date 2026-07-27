@@ -125,4 +125,26 @@ footer { text-align: center; margin-top: 40px; padding: 20px 0; color: var(--tex
 
 .floating-emoji { position: absolute; font-size: 2rem; pointer-events: none; animation: floatUp 1s ease-out forwards; z-index: 100; }
 @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-100px) scale(1.5); opacity: 0; } }
-#toast-container { font-size: 0.85rem; color: var(--status-red); font-weight: normal; opacity: 0; transition: opacity 0.3s; }
+#toast-container { 
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
+    background: rgba(255, 255, 255, 0.95); color: #111; padding: 12px 24px; 
+    border-radius: 20px; font-size: 0.95rem; font-weight: 600; opacity: 0; 
+    pointer-events: none; transition: opacity 0.3s, bottom 0.3s; z-index: 1000; 
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: center; 
+}
+#toast-container.show { opacity: 1; bottom: 40px; }
+
+/* User Settings */
+.user-settings { display: flex; gap: 10px; margin: 15px 0 25px 0; justify-content: center; }
+.user-settings input { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 10px 15px; color: #fff; outline: none; transition: all 0.3s; }
+.user-settings input:focus { border-color: var(--accent-color); background: rgba(255, 255, 255, 0.15); }
+.user-settings button { background: var(--accent-color); color: white; border: none; border-radius: 8px; padding: 10px 15px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.user-settings button:hover { background: #5b4bcf; }
+
+/* Controles do Feed */
+.feed-controls { display: flex; justify-content: flex-end; align-items: center; margin: 15px 0 10px 0; }
+.feed-actions { display: flex; gap: 15px; align-items: center; }
+.toggle-label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 0.9rem; color: #ccc; }
+.toggle-label input { accent-color: var(--accent-color); cursor: pointer; width: 16px; height: 16px; }
+#reload-feed-btn { background: rgba(255, 255, 255, 0.1); color: white; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; }
+#reload-feed-btn:hover { background: rgba(255, 255, 255, 0.2); }
