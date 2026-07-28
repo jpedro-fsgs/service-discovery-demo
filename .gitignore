@@ -3,4 +3,5 @@ dist/
 .env
 *.log
 *.pdf
+*.zip
 UFGTeX-Presentation/
