@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Infraestrutura do Emoji Social Network — Service Discovery com Consul.
+  Cria uma EC2 com Docker Compose e duas distribuições CloudFront (Frontend e Consul UI).
+
+# ============================================================
+# Parâmetros — valores que o usuário pode personalizar no deploy
+# ============================================================
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: Tipo da instância EC2
+
+  KeyPairName:
+    Type: String
+    Default: ""
+    Description: >
+      (Opcional) Nome de um Key Pair existente para acesso SSH.
+      Deixe vazio se não precisar de SSH.
+
+  GitRepoUrl:
+    Type: String
+    Default: https://github.com/jpedro-fsgs/service-discovery-demo.git
+    Description: URL do repositório Git a ser clonado na EC2
+
+# ============================================================
+# Condições
+# ============================================================
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, ""]]
+
+# ============================================================
+# Recursos
+# ============================================================
+Resources:
+
+  # 1. Grupo de Segurança — SSH + Saída para Internet
+  SGBase:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite SSH e saida para internet
+      GroupName: sg-base-acesso
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          FromPort: 0
+          ToPort: 0
+          CidrIp: 0.0.0.0/0
+
+  # 2. Grupo de Segurança — Frontend (Porta 8080) só aceita CloudFront
+  SGFront:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite CloudFront na porta 8080
+      GroupName: sg-front-cloudfront
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourcePrefixListId: pl-3b927c52  # com.amazonaws.global.cloudfront.origin-facing
+
+  # 3. Grupo de Segurança — Consul UI (Porta 8500) só aceita CloudFront
+  SGConsul:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Permite CloudFront na porta 8500
+      GroupName: sg-consul-cloudfront
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8500
+          ToPort: 8500
+          SourcePrefixListId: pl-3b927c52  # com.amazonaws.global.cloudfront.origin-facing
+
+  # 4. Instância EC2 — roda o Docker Compose via User Data
+  Servidor:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      # Ubuntu 24.04 LTS em us-east-1 (resolve via SSM Parameter Store)
+      ImageId: !Sub "{{resolve:ssm:/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id}}"
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref "AWS::NoValue"]
+      SecurityGroupIds:
+        - !GetAtt SGBase.GroupId
+        - !GetAtt SGFront.GroupId
+        - !GetAtt SGConsul.GroupId
+      Tags:
+        - Key: Name
+          Value: Servidor-Docker-CloudFormation
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+
+          # Instala dependências base
+          apt update -y
+          apt install -y ca-certificates curl git
+
+          # Adiciona chave GPG oficial do Docker
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+          chmod a+r /etc/apt/keyrings/docker.asc
+
+          # Adiciona repositório do Docker
+          . /etc/os-release
+          CODENAME="${UBUNTU_CODENAME:-$VERSION_CODENAME}"
+          ARCH="$(dpkg --print-architecture)"
+          cat > /etc/apt/sources.list.d/docker.list <<REPO
+          deb [arch=$ARCH signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $CODENAME stable
+          REPO
+
+          # Instala Docker Engine + Compose Plugin
+          apt update -y
+          apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          usermod -aG docker ubuntu
+
+          # Clona o repositório e sobe a aplicação
+          cd /home/ubuntu
+          git clone ${GitRepoUrl} app
+          chown -R ubuntu:ubuntu /home/ubuntu/app
+          cd app
+          docker compose up -d
+
+  # 5. CloudFront para o Frontend (porta 8080 da EC2)
+  FrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: EC2-Front
+            DomainName: !GetAtt Servidor.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 8080
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: EC2-Front
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad          # CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-b392-75d506927902   # AllViewerExceptHostHeader
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  # 6. CloudFront para o Consul UI (porta 8500 da EC2)
+  ConsulDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: EC2-Consul
+            DomainName: !GetAtt Servidor.PublicDnsName
+            CustomOriginConfig:
+              HTTPPort: 8500
+              HTTPSPort: 443
+              OriginProtocolPolicy: http-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: EC2-Consul
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad          # CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-b392-75d506927902   # AllViewerExceptHostHeader
+        Restrictions:
+          GeoRestriction:
+            RestrictionType: none
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+# ============================================================
+# Outputs — links exibidos ao final do deploy
+# ============================================================
+Outputs:
+  LinkFrontend:
+    Description: URL HTTPS do Frontend (via CloudFront)
+    Value: !Sub "https://${FrontDistribution.DomainName}"
+
+  LinkConsul:
+    Description: URL HTTPS do Consul UI (via CloudFront)
+    Value: !Sub "https://${ConsulDistribution.DomainName}"
+
+  IPPublicoEC2:
+    Description: IP público da EC2 (para SSH)
+    Value: !GetAtt Servidor.PublicIp

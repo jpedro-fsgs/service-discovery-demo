@@ -1,0 +1,394 @@
+\documentclass[aspectratio=169,t,xcolor=table]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{booktabs}
+\usepackage{listings}
+
+\usetheme{Ufg}
+\usetikzlibrary{positioning, fit, backgrounds}
+
+\setbeamertemplate{caption}[numbered]
+
+% Configuração para o código JavaScript com coloração
+\lstdefinelanguage{JavaScript}{
+  keywords={const, let, async, await, throw, new, function, return, try, catch, if},
+  keywordstyle=\color{UFGBlue}\bfseries,
+  comment=[l]{//},
+  commentstyle=\color{DarkGreen}\ttfamily,
+  stringstyle=\color{DarkOrange}\ttfamily,
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]`
+}
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  showstringspaces=false
+}
+
+\AtBeginSection[]{%
+    \setLayout{mainpoint}%
+    \setBGColor{\currentsectioncolor}%
+    \begin{frame}[noframenumbering]{}%
+        \frametitle{\insertsectionhead}%
+    \end{frame}%
+    \setLayout{vertical}%
+}
+
+\setPrimaryColor{UFGBlue}
+\setLogos{lib/logos/INF-compact-white.png}{lib/logos/INF-compact-white.png}
+
+\begin{document}
+
+\title[Seminário SD]{Service Discovery e Resiliência}
+\subtitle{Da Arquitetura Local à AWS Cloud Native}
+\author[Equipe]{
+  Felipe Oliveira Carvalho, 
+  João Pedro de Freitas Gonçalves, \\
+  Eduardo Martins, 
+  Wendel Souza, 
+  Gabriel Machado Elias
+}
+\institute[UFG]{%
+  Instituto de Informática\\
+  Universidade Federal de Goiás
+}
+\date{2026}
+
+\frame[noframenumbering]{\titlepage}
+
+%---------------------------------------------------------
+\setLayout{vertical}
+\begin{frame}{Agenda}
+    \tableofcontents
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Stack Tecnológica}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{Tecnologias Utilizadas}
+
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Backend (Microsserviços)}
+        \begin{itemize}
+            \item Node.js 22 + TypeScript 5.7
+            \item Fastify 5 (Alta performance)
+            \item ES Modules
+            \item JWT (Autenticação Stateless)
+        \end{itemize}
+
+        \vspace{0.5em}
+        \textbf{Armazenamento}
+        \begin{itemize}
+            \item Redis 7 (Cache do feed em memória)
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \textbf{Frontend (Web e API Gateway)}
+        \begin{itemize}
+            \item HTML5 + CSS3 (Glassmorphism)
+            \item Vanilla JavaScript + Axios
+        \end{itemize}
+
+        \vspace{0.5em}
+        \textbf{Infraestrutura e Orquestração}
+        \begin{itemize}
+            \item Docker e Docker Compose
+            \item HashiCorp Consul (Service Discovery)
+        \end{itemize}
+    \end{columns}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Arquitetura Atual (Docker + Consul)}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{Arquitetura com HashiCorp Consul}
+
+    \begin{columns}
+        \column{0.55\textwidth}
+        \begin{itemize}
+            \item \textbf{Cérebro (Consul):} Registra e monitora.
+            \item \textbf{Gateway (Frontend):} Descobre APIs.
+            \item \textbf{Microsserviços:} Auth e Posts.
+        \end{itemize}
+        
+        \vspace{0.5em}
+        \begin{block}{Benefício}
+            Portas dinâmicas garantem resiliência.
+        \end{block}
+
+        \column{0.45\textwidth}
+        \begin{center}
+        \begin{tikzpicture}[
+            rect/.style={rectangle, rounded corners=3pt, minimum height=0.6cm, align=center, font=\scriptsize\bfseries, text=white},
+            arr/.style={->, thick, color=gray!70}
+        ]
+            \node[rect, fill=UFGBlue, minimum width=3cm] (front) at (0, 3) {Frontend (Gateway)};
+            \node[rect, fill=UFGBlue, minimum width=3cm] (consul) at (0, 1.5) {HashiCorp Consul};
+            \node[rect, fill=UFGBlue, minimum width=1.4cm] (auth) at (-0.8, 0) {Auth};
+            \node[rect, fill=UFGBlue, minimum width=1.4cm] (posts) at (0.8, 0) {Posts};
+
+            \draw[arr] (front) -- node[right, font=\tiny] {Consulta} (consul);
+            \draw[arr, dashed] (auth) -- (consul);
+            \draw[arr, dashed] (posts) -- (consul);
+        \end{tikzpicture}
+        \end{center}
+    \end{columns}
+
+\end{frame}
+
+%--------------------------------------------------------
+\setLayout{vertical}
+\begin{frame}[fragile]{Snippet: Anunciando Serviço no Consul}
+
+    \begin{lstlisting}[language=JavaScript, caption=Registro Dinâmico (Backend)]
+async function registerService({ name, host, port }) {
+  const config = {
+    ID: `${name}-${host}-${port}`,
+    Name: name,
+    Address: host,
+    Port: port,
+    Check: {
+      HTTP: `http://${host}:${port}/health`,
+      Interval: '10s'
+    }
+  };
+  // Cadastra-se no Cérebro (Consul) ao ligar
+  await axios.put(`http://consul:8500/v1/agent/service/register`, config);
+}
+    \end{lstlisting}
+
+\end{frame}
+
+%--------------------------------------------------------
+\setLayout{vertical}
+\begin{frame}[fragile]{Snippet: Descobrindo Serviços}
+
+    \begin{lstlisting}[language=JavaScript, caption=Consulta Dinâmica (Frontend)]
+async function discover(name) {
+  // O Gateway pergunta ao Consul quem esta saudavel
+  const url = `http://consul:8500/v1/health/service/${name}?passing=true`;
+  const res = await axios.get(url);
+  
+  if (!res.data.length) throw new Error("Unavailable");
+
+  // Balanceamento de carga basico (Random)
+  const node = res.data[Math.floor(Math.random() * res.data.length)];
+  return { address: node.Service.Address, port: node.Service.Port };
+}
+    \end{lstlisting}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Resiliência: Graceful Degradation}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{Graceful Degradation na Prática}
+
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Se o Auth Service cair:}
+        \begin{itemize}
+            \item Consul detecta a falha.
+            \item Novos logins falham.
+            \item \textbf{Feed continua rodando!}
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \begin{block}{O Segredo: JWT Stateless}
+            O Posts Service valida as sessões ativas localmente, sem depender de rede.
+        \end{block}
+    \end{columns}
+
+\end{frame}
+
+%--------------------------------------------------------
+\setLayout{vertical}
+\begin{frame}[fragile]{Snippet: Validação Stateless}
+
+    \begin{lstlisting}[language=JavaScript, caption=Posts Service - Validação Desacoplada]
+app.decorate("authenticate", async (req, reply) => {
+  try {
+    // Valida a assinatura matematicamente
+    // Nao precisa consultar o Auth-Service!
+    await req.jwtVerify();
+  } catch (err) {
+    reply.code(401).send({ error: "Token invalido" });
+  }
+});
+    \end{lstlisting}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Redes: Amazon VPC e Docker Network}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{A Rede na Nuvem}
+
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{VPC = Seu Docker Network Global}
+        \begin{itemize}
+            \item Assim como o Docker isola os contêineres do seu PC, a \textbf{VPC} isola os recursos na nuvem.
+        \end{itemize}
+        
+        \vspace{0.5em}
+        \textbf{Comparação Direta:}
+        \begin{itemize}
+            \item \texttt{docker network} $\rightarrow$ VPC Subnets
+            \item \texttt{ports: 8080} $\rightarrow$ Security Groups
+        \end{itemize}
+
+        \column{0.5\textwidth}
+        \begin{block}{Security Groups}
+            Agem como firewalls. Permitem liberar apenas a porta do Frontend para a Internet, escondendo todo o restante do ecossistema.
+        \end{block}
+    \end{columns}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{A Etapa Intermediária (AWS EC2)}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{Migração: Lift and Shift}
+
+    \begin{columns}
+        \column{0.55\textwidth}
+        \textbf{Copiando o ambiente local:}
+        \begin{itemize}
+            \item O código não muda!
+            \item Alugamos um servidor (EC2) e executamos o mesmo \texttt{docker-compose.yml}.
+            \item \textbf{AWS CloudFront} entra como escudo HTTPS (CDN Global).
+        \end{itemize}
+        
+        \vspace{0.5em}
+        \begin{alertblock}{O Problema}
+            A EC2 vira um gargalo e um Ponto Único de Falha (SPOF).
+        \end{alertblock}
+
+        \column{0.45\textwidth}
+        \begin{center}
+        \begin{tikzpicture}[
+            rect/.style={rectangle, rounded corners=3pt, minimum height=0.5cm, align=center, font=\scriptsize\bfseries, text=white},
+            arr/.style={->, thick, color=gray!70}
+        ]
+            \node[rect, fill=UFGBlue, minimum width=2.5cm] (cdn) at (0, 3) {CloudFront};
+            \node[rect, fill=DarkGray, minimum width=2.5cm, minimum height=2.2cm] (ec2) at (0, 1) {};
+            \node[font=\scriptsize\bfseries, text=white] at (0, 1.8) {Amazon EC2};
+            
+            \node[rect, fill=UFGBlue, minimum width=2cm] (front) at (0, 1.2) {Frontend};
+            \node[rect, fill=UFGBlue, minimum width=0.9cm] (auth) at (-0.5, 0.4) {Auth};
+            \node[rect, fill=UFGBlue, minimum width=0.9cm] (posts) at (0.5, 0.4) {Posts};
+
+            \draw[arr] (cdn) -- (ec2);
+            \draw[arr, dashed] (front) -- (auth);
+            \draw[arr, dashed] (front) -- (posts);
+        \end{tikzpicture}
+        \end{center}
+    \end{columns}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Evolução: Arquitetura Cloud Native}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{Quebrando a EC2 com Amazon ECS}
+
+    \begin{columns}
+        \column{0.55\textwidth}
+        \textbf{Substituições na Nuvem:}
+        \begin{itemize}
+            \item EC2 $\rightarrow$ ECS Fargate (Serverless)
+            \item Consul $\rightarrow$ AWS Cloud Map
+            \item Redis $\rightarrow$ Amazon ElastiCache
+        \end{itemize}
+        
+        \vspace{0.5em}
+        \begin{block}{Escalonamento Real}
+            Cada API escala de forma autônoma sem precisarmos provisionar hardware.
+        \end{block}
+
+        \column{0.45\textwidth}
+        \begin{center}
+        \begin{tikzpicture}[
+            rect/.style={rectangle, rounded corners=3pt, minimum height=0.5cm, align=center, font=\scriptsize\bfseries, text=white},
+            arr/.style={->, thick, color=gray!70}
+        ]
+            \node[rect, fill=UFGBlue, minimum width=3cm] (cdn) at (0, 3.5) {CloudFront};
+            \node[rect, fill=UFGBlue, minimum width=3cm] (alb) at (0, 2.3) {ALB (Gateway)};
+            \node[rect, fill=UFGBlue, minimum width=1.4cm] (auth) at (-0.8, 1) {ECS Auth};
+            \node[rect, fill=UFGBlue, minimum width=1.4cm] (posts) at (0.8, 1) {ECS Posts};
+            \node[rect, fill=UFGBlue, minimum width=3cm] (map) at (0, -0.2) {AWS Cloud Map};
+
+            \draw[arr] (cdn) -- (alb);
+            \draw[arr] (alb) -- (auth);
+            \draw[arr] (alb) -- (posts);
+            \draw[arr, dashed] (auth) -- (map);
+            \draw[arr, dashed] (posts) -- (map);
+        \end{tikzpicture}
+        \end{center}
+    \end{columns}
+
+\end{frame}
+
+%==========================================================
+\section[UFGBlue]{Discovery Gerenciado (AWS Cloud Map)}
+
+%--------------------------------------------------------
+\setLayout{horizontal}
+\begin{frame}{O Fim do Código de Descoberta}
+
+    \begin{columns}
+        \column{0.5\textwidth}
+        \textbf{Service Discovery Serverless}
+        \begin{itemize}
+            \item O \textbf{Cloud Map} substitui o HashiCorp Consul.
+            \item Em vez de \textit{API-based} (o Axios fazendo GET no Consul), passamos a usar \textit{DNS-based}.
+        \end{itemize}
+        
+        \column{0.5\textwidth}
+        \begin{block}{Magia da Rede (DNS)}
+            O código deleta toda a complexidade do Consul. O Frontend simplesmente chama \texttt{http://auth.local}. O DNS da AWS descobre qual IP está vivo e roteia o pacote.
+        \end{block}
+    \end{columns}
+
+\end{frame}
+
+%--------------------------------------------------------
+\setLayout{blank}
+\setBGColor{UFGBlue}
+\begin{frame}
+
+    \centering
+    \vspace{2cm}
+
+    \textbf{\Huge Obrigado}
+
+    \vspace{1.5cm}
+    \begin{figure}
+        \centering
+        \includegraphics[height=3cm]{lib/logos/INF-full-white.png}
+    \end{figure}
+
+\end{frame}
+
+%--------------------------------------------------------
+\setLayout{titlepage}
+\setBGColor{UFGBlue}
+\titlepage
+
+\end{document}
